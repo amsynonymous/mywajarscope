@@ -1,0 +1,43 @@
+name: Keep MyWajarScope awake
+
+# Streamlit Community Cloud puts apps to sleep after 12 hours without visitors.
+# This visits the app every 6 hours during the MDIT 2026 judging period and wakes it if needed.
+# Delete this file after the competition ends (12 Dec 2026).
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install headless browser
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Visit the app and wake it if it is asleep
+        run: |
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+          URL = "https://mywajarscope.streamlit.app/"
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page()
+              page.goto(URL, timeout=120000)
+              page.wait_for_timeout(10000)
+              wake = page.get_by_role("button", name="Yes, get this app back up!")
+              if wake.count():
+                  print("App was asleep - waking it up")
+                  wake.first.click()
+                  page.wait_for_timeout(90000)
+              else:
+                  print("App is awake")
+              print("Page title:", page.title())
+              browser.close()
+          PY
